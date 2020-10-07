@@ -6,18 +6,34 @@
 #define UNITMAKER_UNITS_H
 
 #include <ratio>
+#include <concepts>
 #include <type_traits>
 
 template<typename T>
-concept UnitType = requires (){
-    {std::ratio_multiply<typename T::base_type, typename T::ratio>::den} -> std::convertible_to<std::intmax_t>;
+concept RatioType = requires (){
+    {T::num} -> std::convertible_to<std::intmax_t>;
+    {T::den} -> std::convertible_to<std::intmax_t>;
+};
+
+template<typename T>
+concept UnitType = requires (T t){
+    RatioType<typename T::base_type>;
+    RatioType<typename T::ratio>;
+    {t.value} -> std::convertible_to<double>;
+};
+
+template<typename T1, typename T2>
+concept EquivalentBaseType = requires () {
+    UnitType<T1>;
+    UnitType<T2>;
+    std::ratio_equal_v<typename T1::base_type, typename T2::base_type>;
 };
 
 enum class BaseTypes {
     MASS=2, LENGTH=3, TIME=5, TEMPERATURE=7, CURRENT=11, LUMINOUS_INTENSITY=13
 };
 
-template<typename T=std::ratio<1, 1>, typename ...Ts>
+template<RatioType T=std::ratio<1, 1>, RatioType ...Ts>
 struct RecursiveRatioMultiply {
     using ratio = std::ratio_multiply<T, typename RecursiveRatioMultiply<Ts...>::ratio>;
 };
@@ -27,10 +43,11 @@ struct RecursiveRatioMultiply<std::ratio<1, 1>> {
     using ratio = std::ratio<1, 1>;
 };
 
-template<typename T>
+template<typename T> // can't constrain on UnitType, since type will be incomplete at this point
 struct AbstractUnit {
 private:
-    template<typename To, typename From, class = typename std::enable_if_t<std::ratio_equal_v<typename To::base_type, typename From::base_type>>>
+    template<UnitType To, UnitType From>
+    requires EquivalentBaseType<To, From>
     static constexpr To convert(const From& from) {
         constexpr double ratio = 1.0 * From::ratio::num * To::ratio::den / From::ratio::den / To::ratio::num;
         return To{from.value * ratio};
@@ -39,13 +56,13 @@ public:
     double value;
     explicit constexpr AbstractUnit(double v) : value{v} {}
 
-    template<typename To>
+    template<UnitType To>
     constexpr operator To() const {
         return convert<To>(static_cast<const T&>(*this));
     }
 };
 
-template<typename T, typename Ratio>
+template<UnitType T, RatioType Ratio>
 struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio>> {
     using AbstractUnit<UnitRatio<T, Ratio>>::AbstractUnit;
 
@@ -61,7 +78,7 @@ struct Unit : public AbstractUnit<Unit<Type>> {
     using ratio = std::ratio<1, 1>;
 };
 
-template<typename ...Ts>
+template<UnitType ...Ts>
 struct MultiUnit : public AbstractUnit<MultiUnit<Ts...>> {
     using AbstractUnit<MultiUnit<Ts...>>::AbstractUnit;
 
@@ -69,7 +86,7 @@ struct MultiUnit : public AbstractUnit<MultiUnit<Ts...>> {
     using ratio = typename RecursiveRatioMultiply<typename Ts::ratio...>::ratio;
 };
 
-template<typename T>
+template<UnitType T>
 struct UnitInverse : public AbstractUnit<UnitInverse<T>> {
     using AbstractUnit<UnitInverse<T>>::AbstractUnit;
 
@@ -99,7 +116,7 @@ constexpr T1 operator*(const T1& t, const T2& v) {
     return T2{t.value * v};
 }
 
-template<typename T1, typename T2>
+template<UnitType T1, UnitType T2>
 constexpr MultiUnit<T1, UnitInverse<T2>> operator/(const T1& t1, const T2& t2) {
     return MultiUnit<T1, UnitInverse<T2>>{t1.value / t2.value};
 }

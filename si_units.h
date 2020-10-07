@@ -62,4 +62,14 @@ using mmHg = Torr;
 using mps = MultiUnit<Meter, Hertz>;
 using mph = MultiUnit<Mile, UnitInverse<Hour>>;
 
+// Helpful templates
+template<UnitType T>
+using Square = MultiUnit<T, T>;
+template<UnitType T>
+using Cubic = MultiUnit<T, T, T>;
+template<UnitType T>
+using Quartic = MultiUnit<T, T, T, T>;
+template<UnitType T>
+using Per = UnitInverse<T>; // redundant, but more in line with english; eg. "per meter"
+
 #endif //UNITMAKER_SI_UNITS_H
