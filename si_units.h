@@ -59,5 +59,7 @@ using PSI = MultiUnit<Pound, UnitInverse<Inch>, UnitInverse<Inch>>;
 using Atmosphere = UnitRatio<Pascal, std::ratio<101325, 1>>;
 using Torr = UnitRatio<Atmosphere, std::ratio<1, 760>>;
 using mmHg = Torr;
+using mps = MultiUnit<Meter, Hertz>;
+using mph = MultiUnit<Mile, UnitInverse<Hour>>;
 
 #endif //UNITMAKER_SI_UNITS_H
