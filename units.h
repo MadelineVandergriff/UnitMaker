@@ -86,6 +86,14 @@ struct MultiUnit : public AbstractUnit<MultiUnit<Ts...>> {
     using ratio = typename RecursiveRatioMultiply<typename Ts::ratio...>::ratio;
 };
 
+template<RatioType BaseType, RatioType Ratio=std::ratio<1, 1>>
+struct SpecifiedUnit : public AbstractUnit<SpecifiedUnit<BaseType, Ratio>> {
+    using AbstractUnit<SpecifiedUnit<BaseType, Ratio>>::AbstractUnit;
+
+    using base_type = BaseType;
+    using ratio = Ratio;
+};
+
 template<UnitType T>
 struct UnitInverse : public AbstractUnit<UnitInverse<T>> {
     using AbstractUnit<UnitInverse<T>>::AbstractUnit;
@@ -130,7 +138,7 @@ constexpr UnitInverse<T2> operator/(const T1& v, const T2& t) {
 template<typename T1, typename T2>
 requires std::is_floating_point_v<T2> && UnitType<T1>
 constexpr T1 operator/(const T1& t, const T2& v) {
-    return T2{t.value / v};
+    return T1{t.value / v};
 }
 
 #endif //UNITMAKER_UNITS_H

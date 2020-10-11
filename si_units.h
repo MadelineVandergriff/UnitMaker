@@ -56,6 +56,7 @@ using FootPound = MultiUnit<Foot, Pound>;
 using PSI = MultiUnit<Pound, UnitInverse<Inch>, UnitInverse<Inch>>;
 
 // Other Units
+using Gram = UnitRatio<Kilogram, std::milli>;
 using Atmosphere = UnitRatio<Pascal, std::ratio<101325, 1>>;
 using Torr = UnitRatio<Atmosphere, std::ratio<1, 760>>;
 using mmHg = Torr;
@@ -71,5 +72,28 @@ template<UnitType T>
 using Quartic = MultiUnit<T, T, T, T>;
 template<UnitType T>
 using Per = UnitInverse<T>; // redundant, but more in line with english; eg. "per meter"
+template<UnitType T>
+using Milli = UnitRatio<T, std::milli>;
+template<UnitType T>
+using Centi = UnitRatio<T, std::centi>;
+template<UnitType T>
+using Deci = UnitRatio<T, std::deci>;
+template<UnitType T>
+using Deca = UnitRatio<T, std::deca>;
+template<UnitType T>
+using Hecto = UnitRatio<T, std::hecto>;
+template<UnitType T>
+using Kilo = UnitRatio<T, std::kilo>;
+template<UnitType T>
+using Mega = UnitRatio<T, std::mega>;
+template<UnitType T>
+using Giga = UnitRatio<T, std::giga>;
+template<UnitType T>
+using Tera = UnitRatio<T, std::tera>;
+
+template<UnitType T1, UnitType T2>
+constexpr auto getConversionFactor(const double factor) {
+    return const_cast<const MultiUnit<T1, Per<T2>>>(MultiUnit<T1, Per<T2>>{factor});
+}
 
 #endif //UNITMAKER_SI_UNITS_H
