@@ -62,6 +62,9 @@ using Torr = UnitRatio<Atmosphere, std::ratio<1, 760>>;
 using mmHg = Torr;
 using mps = MultiUnit<Meter, Hertz>;
 using mph = MultiUnit<Mile, UnitInverse<Hour>>;
+using Rankine = UnitRatio<Kelvin, std::ratio<10, 18>>;
+using Celsius = UnitOffset<Kelvin, std::ratio<27315, 100>>;
+using Fahrenheit = UnitOffset<Rankine, std::ratio<45967, 100>>;
 
 // Helpful templates
 template<UnitType T>

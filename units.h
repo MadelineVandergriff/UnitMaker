@@ -52,11 +52,17 @@ private:
         constexpr double ratio = 1.0 * From::ratio::num * To::ratio::den / From::ratio::den / To::ratio::num;
         return To{from.value * ratio};
     }
+
+    template<typename To, UnitType From>
+    requires std::ratio_equal_v<typename From::ratio, std::ratio<1, 1>> && std::convertible_to<double, To>
+    static constexpr double convert(const From& from) {
+        return from.value;
+    }
 public:
     double value;
     explicit constexpr AbstractUnit(double v) : value{v} {}
 
-    template<UnitType To>
+    template<typename To>
     constexpr operator To() const {
         return convert<To>(static_cast<const T&>(*this));
     }
@@ -102,9 +108,21 @@ struct UnitInverse : public AbstractUnit<UnitInverse<T>> {
     using ratio = std::ratio_divide<std::ratio<1, 1>, typename T::ratio>;
 };
 
-template<typename T, typename Offset>
+template<UnitType T, RatioType Offset>
 struct UnitOffset {
     double value;
+
+    explicit constexpr UnitOffset(double d): value{d} {}
+
+    //using base_type = typename T::base_type;
+    //using ratio = typename T::ratio;
+
+    template<UnitType To>
+    requires EquivalentBaseType<T, To>
+    constexpr operator To() const {
+        constexpr double offset = 1.0 * Offset::num / Offset::den;
+        return To{T{value + offset}};
+    }
 };
 
 template<UnitType T1, UnitType T2>
