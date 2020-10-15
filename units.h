@@ -23,11 +23,10 @@ concept UnitType = requires (T t){
 };
 
 template<typename T1, typename T2>
-concept EquivalentBaseType = requires () {
-    UnitType<T1>;
-    UnitType<T2>;
+concept EquivalentBaseType =
+    UnitType<T1> &&
+    UnitType<T2> &&
     std::ratio_equal_v<typename T1::base_type, typename T2::base_type>;
-};
 
 enum class BaseTypes {
     MASS=2, LENGTH=3, TIME=5, TEMPERATURE=7, CURRENT=11, LUMINOUS_INTENSITY=13
@@ -64,7 +63,7 @@ public:
 
     template<typename To>
     constexpr operator To() const {
-        return convert<To>(static_cast<const T&>(*this));
+        return convert<To, T>(static_cast<const T&>(*this));
     }
 };
 
