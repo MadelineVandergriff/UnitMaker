@@ -158,4 +158,16 @@ constexpr T1 operator/(const T1& t, const T2& v) {
     return T1{t.value / v};
 }
 
+template<UnitType T1, UnitType T2>
+requires EquivalentBaseType<T1, T2>
+constexpr T1 operator+(const T1& t1, const T2& t2) {
+    return T1{t1.value + T1{t2}.value};
+}
+
+template<UnitType T1, UnitType T2>
+requires EquivalentBaseType<T1, T2>
+constexpr T1 operator-(const T1& t1, const T2& t2) {
+    return T1{t1.value - T1{t2}.value};
+}
+
 #endif //UNITMAKER_UNITS_H
