@@ -4,6 +4,35 @@
 UnitMaker provides the ability to define units of specified base types, and then further refine by multiplying by a ratio (eg. kg to lb), offseting by a fraction (eg. K to &deg;C), inverting (eg. s to Hz), and combining units together (eg. N and m to J). Furthermore it allows for implicitly converting between untis of equivalent base type (eg. N and lbf), allowing for easy to write and easier to read functions and classes. It is a header-only library, and thus can be included inside a namespace for easy encapsulation. ```units.h``` provides the basic functionality, and ```si_units.h``` provides a non-comprehensive implementation of si units and more.
 
 ## Examples
+### Creating New Units
+```c++
+#include <units.h>
+#include <iostream>
+
+// Creating a base type, every length unit defined in relation to Pixel
+using Pixel = Unit<BaseTypes::LENGTH>;
+using Second = Unit<BaseTypes::TIME>;
+
+// Creating a unit based off of a ratio, in this case one Inch is 96/1 Pixel(s)
+using Inch = UnitRatio<Pixel, std::ratio<96, 1>>;
+
+// One Foot is 12/1 Inch is 96/1*12/1 = 1152/1 Pixel(s)
+using Foot = UnitRatio<Inch, std::ratio<12, 1>>;
+
+// Inverse units can be created and used as expected
+using Hertz = UnitInverse<Second>;
+
+// MultiUnits multiply all the units together
+using FeetPerSecond = MultiUnit<Foot, Hertz>;
+
+// SpecificUnits allow specifying the base type and ratio
+// Can be useful for defining complicated units
+using SevenTimesBaseSeven = SpecifiedUnit<std::ratio<7, 1>, std::ratio<7, 1>>;
+
+// Using primes greater than 13 allows for user defined base_types
+using Sievert = SpecifiedUnit<std::ratio<17, 1>>;
+```
+
 ### Implicit Conversion
 ```c++
 #include <si_units.h>
