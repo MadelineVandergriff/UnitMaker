@@ -32,6 +32,13 @@ enum class BaseTypes {
     MASS=2, LENGTH=3, TIME=5, TEMPERATURE=7, CURRENT=11, LUMINOUS_INTENSITY=13
 };
 
+template<typename T>
+struct RuntimeRatio {
+    static inline intmax_t num = 1;
+    static inline intmax_t den = 1;
+    using type = T;
+};
+
 template<RatioType T=std::ratio<1, 1>, RatioType ...Ts>
 struct RecursiveRatioMultiply {
     using ratio = std::ratio_multiply<T, typename RecursiveRatioMultiply<Ts...>::ratio>;
@@ -67,13 +74,6 @@ public:
     }
 };
 
-template<UnitType T, RatioType Ratio>
-struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio>> {
-    using AbstractUnit<UnitRatio<T, Ratio>>::AbstractUnit;
-
-    using base_type = typename T::base_type;
-    using ratio = std::ratio_multiply<Ratio, typename T::ratio>;
-};
 
 template<BaseTypes Type>
 struct Unit : public AbstractUnit<Unit<Type>> {
@@ -81,6 +81,14 @@ struct Unit : public AbstractUnit<Unit<Type>> {
 
     using base_type = std::ratio<(int)Type, 1>;
     using ratio = std::ratio<1, 1>;
+};
+
+template<UnitType T, RatioType Ratio>
+struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio>> {
+    using AbstractUnit<UnitRatio<T, Ratio>>::AbstractUnit;
+
+    using base_type = typename T::base_type;
+    using ratio = std::ratio_multiply<Ratio, typename T::ratio>;
 };
 
 template<UnitType ...Ts>
@@ -97,6 +105,24 @@ struct SpecifiedUnit : public AbstractUnit<SpecifiedUnit<BaseType, Ratio>> {
 
     using base_type = BaseType;
     using ratio = Ratio;
+};
+
+template<BaseTypes Type>
+struct RuntimeUnit {
+    double value;
+    explicit constexpr RuntimeUnit(double v): value(v) {}
+
+    template<UnitType T>
+    requires EquivalentBaseType<RuntimeUnit<Type>, T>
+    constexpr operator T() {
+        return T{Unit<Type>{value * ratio::num / ratio::den}};
+    }
+
+    using base_type = std::ratio<(int) Type, 1>;
+    struct ratio {
+        static inline intmax_t num = 1;
+        static inline intmax_t den = 1;
+    };
 };
 
 template<UnitType T>
