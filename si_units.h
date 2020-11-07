@@ -5,7 +5,11 @@
 #ifndef UNITMAKER_SI_UNITS_H
 #define UNITMAKER_SI_UNITS_H
 
+#if __cplusplus > 201703L
 #include "units.h"
+#else
+#include "units_17.h"
+#endif
 
 using Kilogram = Unit<BaseTypes::MASS>;
 using Meter = Unit<BaseTypes::LENGTH>;
@@ -67,34 +71,34 @@ using Celsius = UnitOffset<Kelvin, std::ratio<27315, 100>>;
 using Fahrenheit = UnitOffset<Rankine, std::ratio<45967, 100>>;
 
 // Helpful templates
-template<UnitType T>
+template<typename T>
 using Square = MultiUnit<T, T>;
-template<UnitType T>
+template<typename T>
 using Cubic = MultiUnit<T, T, T>;
-template<UnitType T>
+template<typename T>
 using Quartic = MultiUnit<T, T, T, T>;
-template<UnitType T>
+template<typename T>
 using Per = UnitInverse<T>; // redundant, but more in line with english; eg. "per meter"
-template<UnitType T>
+template<typename T>
 using Milli = UnitRatio<T, std::milli>;
-template<UnitType T>
+template<typename T>
 using Centi = UnitRatio<T, std::centi>;
-template<UnitType T>
+template<typename T>
 using Deci = UnitRatio<T, std::deci>;
-template<UnitType T>
+template<typename T>
 using Deca = UnitRatio<T, std::deca>;
-template<UnitType T>
+template<typename T>
 using Hecto = UnitRatio<T, std::hecto>;
-template<UnitType T>
+template<typename T>
 using Kilo = UnitRatio<T, std::kilo>;
-template<UnitType T>
+template<typename T>
 using Mega = UnitRatio<T, std::mega>;
-template<UnitType T>
+template<typename T>
 using Giga = UnitRatio<T, std::giga>;
-template<UnitType T>
+template<typename T>
 using Tera = UnitRatio<T, std::tera>;
 
-template<UnitType T1, UnitType T2>
+template<typename T1, typename T2>
 constexpr auto getConversionFactor(const double factor) {
     return const_cast<const MultiUnit<T1, Per<T2>>>(MultiUnit<T1, Per<T2>>{factor});
 }
