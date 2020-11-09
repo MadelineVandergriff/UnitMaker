@@ -26,7 +26,7 @@ struct is_unit : std::false_type {};
 
 template<typename T>
 struct is_unit<T, std::void_t<typename T::base_type, typename T::ratio, decltype(T::value)>> :
-        std::conjunction<is_ratio<typename T::base_type>, is_ratio<typename T::ratio>, std::is_convertible<decltype(T::value), double>> {};
+        std::conjunction<is_ratio<typename T::base_type>, is_ratio<typename T::ratio>, std::is_arithmetic<decltype(T::value)>> {};
 
 template<typename T>
 inline constexpr bool is_unit_v = is_unit<T>::value;
@@ -63,24 +63,30 @@ struct RecursiveRatioMultiply<std::ratio<1, 1>> {
     using ratio = std::ratio<1, 1>;
 };
 
-template<typename T>
+template<typename T, typename Numeric = double>
 struct AbstractUnit {
+    static_assert(std::is_arithmetic_v<Numeric>, "AbstractUnit requires an arithmetic type (see std::is_arithmetic<T>)");
 private:
     template<typename To, typename From, class = typename
             std::enable_if_t<has_equivalent_base_type_v<To, From>>>
     static constexpr To convert(const From& from) {
-        constexpr double ratio = 1.0 * From::ratio::num * To::ratio::den / From::ratio::den / To::ratio::num;
-        return To{from.value * ratio};
+        using ratio_t = std::ratio<From::ratio::num * To::ratio::den, From::ratio::den * To::ratio::num>;
+        if constexpr (std::is_integral_v<decltype(To::value)> && ratio_t::den == 1) {
+            return To{static_cast<decltype(To::value)>(from.value * ratio_t::num)};
+        } else {
+            constexpr double ratio = 1.0 * ratio_t::num / ratio_t::den;
+            return To{from.value * ratio};
+        }
     }
 
     template<typename To, typename From, class = typename
             std::enable_if_t<is_unit_v<From> && std::ratio_equal_v<typename From::ratio, std::ratio<1, 1>> && std::is_convertible_v<double, To>>>
-    static constexpr double convert(const From& from) {
+    static constexpr double convert(const From& from) { // TODO find a fix for this
         return from.value;
     }
 public:
-    double value;
-    explicit constexpr AbstractUnit(double v) : value{v} {}
+    Numeric value;
+    explicit constexpr AbstractUnit(Numeric v) : value{v} {}
 
     template<typename To>
     constexpr operator To() const {
@@ -89,50 +95,53 @@ public:
 };
 
 
-template<BaseTypes Type>
-struct Unit : public AbstractUnit<Unit<Type>> {
-    using AbstractUnit<Unit<Type>>::AbstractUnit;
+template<BaseTypes Type, typename Numeric = double>
+struct Unit : public AbstractUnit<Unit<Type, Numeric>, Numeric> {
+    using AbstractUnit<Unit<Type, Numeric>, Numeric>::AbstractUnit;
 
     using base_type = std::ratio<(int)Type, 1>;
     using ratio = std::ratio<1, 1>;
 };
 
 template<typename T, typename Ratio>
-struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio>> {
+struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio>, decltype(T::value)> {
     static_assert(is_unit_v<T>, "UnitRatio must be passed a valid unit (see is_unit<T>)");
     static_assert(is_ratio_v<Ratio>, "UnitRatio must be passed a valid ratio (see is_ratio<T>)");
 
-    using AbstractUnit<UnitRatio<T, Ratio>>::AbstractUnit;
+    using AbstractUnit<UnitRatio<T, Ratio>, decltype(T::value)>::AbstractUnit;
 
     using base_type = typename T::base_type;
     using ratio = std::ratio_multiply<Ratio, typename T::ratio>;
 };
 
 template<typename ...Ts>
-struct MultiUnit : public AbstractUnit<MultiUnit<Ts...>> {
+struct MultiUnit : public AbstractUnit<MultiUnit<Ts...>, std::common_type_t<decltype(Ts::value)...>> {
     static_assert(std::conjunction_v<is_unit<Ts>...>, "MultiUnit must be passed only valid units (see is_unit<T>)");
 
-    using AbstractUnit<MultiUnit<Ts...>>::AbstractUnit;
+    using AbstractUnit<MultiUnit<Ts...>, std::common_type_t<decltype(Ts::value)...>>::AbstractUnit;
 
     using base_type = typename RecursiveRatioMultiply<typename Ts::base_type...>::ratio;
     using ratio = typename RecursiveRatioMultiply<typename Ts::ratio...>::ratio;
 };
 
-template<typename BaseType, typename Ratio=std::ratio<1, 1>>
-struct SpecifiedUnit : public AbstractUnit<SpecifiedUnit<BaseType, Ratio>> {
+template<typename BaseType, typename Ratio=std::ratio<1, 1>, typename Numeric = double>
+struct SpecifiedUnit : public AbstractUnit<SpecifiedUnit<BaseType, Ratio, Numeric>, Numeric> {
     static_assert(is_ratio_v<BaseType>, "SpecifiedUnit requires a ratio as BaseType (see is_ratio<T>)");
     static_assert(is_ratio_v<Ratio>, "SpecifiedUnit requires a ratio as Ratio (see is_ratio<T>)");
 
-    using AbstractUnit<SpecifiedUnit<BaseType, Ratio>>::AbstractUnit;
+    using AbstractUnit<SpecifiedUnit<BaseType, Ratio, Numeric>, Numeric>::AbstractUnit;
 
     using base_type = BaseType;
     using ratio = Ratio;
 };
 
-template<BaseTypes Type, int ID>
+template<typename T, typename Numeric>
+using NumericUnit = SpecifiedUnit<typename T::base_type, typename T::ratio, Numeric>;
+
+template<BaseTypes Type, int ID, typename Numeric = double>
 struct RuntimeUnit {
-    double value;
-    explicit constexpr RuntimeUnit(double v): value(v) {}
+    Numeric value;
+    explicit constexpr RuntimeUnit(Numeric v): value(v) {}
 
     template<typename T, class = typename std::enable_if_t<has_equivalent_base_type_v<T, RuntimeUnit<Type, ID>>>>
     explicit constexpr RuntimeUnit(T other): value{Unit<Type>{other}.value / ratio::num * ratio::den} {}
@@ -150,23 +159,23 @@ struct RuntimeUnit {
 };
 
 template<typename T>
-struct UnitInverse : public AbstractUnit<UnitInverse<T>> {
+struct UnitInverse : public AbstractUnit<UnitInverse<T>, decltype(T::value)> {
     static_assert(is_unit_v<T>, "UnitInverse must be passed a valid unit (see is_unit<T>)");
 
-    using AbstractUnit<UnitInverse<T>>::AbstractUnit;
+    using AbstractUnit<UnitInverse<T>, decltype(T::value)>::AbstractUnit;
 
     using base_type = std::ratio_divide<std::ratio<1, 1>, typename T::base_type>;
     using ratio = std::ratio_divide<std::ratio<1, 1>, typename T::ratio>;
 };
 
-template<typename T, typename Offset>
+template<typename T, typename Offset, typename Numeric = double>
 struct UnitOffset {
     static_assert(is_unit_v<T>, "UnitOffset must be passed a valid unit (see is_unit<T>)");
     static_assert(is_ratio_v<Offset>, "UnitOffset must be passed a valid ratio (see is_ratio<T>)");
 
-    double value;
+    Numeric value;
 
-    explicit constexpr UnitOffset(double d): value{d} {}
+    explicit constexpr UnitOffset(Numeric d): value{d} {}
 
     //using base_type = typename T::base_type;
     //using ratio = typename T::ratio;
@@ -186,14 +195,14 @@ constexpr MultiUnit<T1, T2> operator*(const T1& t1, const T2& t2) {
 
 template<typename T1, typename T2, class = typename
         std::enable_if_t<std::is_arithmetic_v<T1> && is_unit_v<T2>>>
-constexpr T2 operator*(const T1& v, const T2& t) {
-    return T2{t.value * v};
+constexpr SpecifiedUnit<typename T2::base_type, typename T2::ratio, decltype(T2::value * T1{})> operator*(const T1& v, const T2& t) {
+    return SpecifiedUnit<typename T2::base_type, typename T2::ratio, decltype(t.value * v)>{t.value * v};
 }
 
 template<typename T1, typename T2, class = typename
         std::enable_if_t<std::is_arithmetic_v<T2> && is_unit_v<T1>>>
-constexpr T1 operator*(const T1& t, const T2& v) {
-    return T1{t.value * v};
+constexpr SpecifiedUnit<typename T1::base_type, typename T1::ratio, decltype(T1::value * T2{})> operator*(const T1& t, const T2& v) {
+    return SpecifiedUnit<typename T1::base_type, typename T1::ratio, decltype(t.value * v)>{t.value * v};
 }
 
 template<typename T1, typename T2, class = typename
@@ -204,26 +213,30 @@ constexpr MultiUnit<T1, UnitInverse<T2>> operator/(const T1& t1, const T2& t2) {
 
 template<typename T1, typename T2, class = typename
         std::enable_if_t<std::is_arithmetic_v<T1> && is_unit_v<T2>>>
-constexpr UnitInverse<T2> operator/(const T1& v, const T2& t) {
-    return UnitInverse<T2>{v / t.value};
+constexpr UnitInverse<SpecifiedUnit<typename T2::base_type, typename T2::ratio, decltype(T1{} / T2::value)>> operator/(const T1& v, const T2& t) {
+    return UnitInverse<SpecifiedUnit<typename T2::base_type, typename T2::ratio, decltype(v / t.value)>>{v / t.value};
 }
 
 template<typename T1, typename T2, class = typename
         std::enable_if_t<std::is_arithmetic_v<T2> && is_unit_v<T1>>>
-constexpr T1 operator/(const T1& t, const T2& v) {
-    return T1{t.value / v};
+constexpr SpecifiedUnit<typename T1::base_type, typename T1::ratio, decltype(T1::value / T2{})> operator/(const T1& t, const T2& v) {
+    return SpecifiedUnit<typename T1::base_type, typename T1::ratio, decltype(t.value / v)>{t.value / v};
 }
 
 template<typename T1, typename T2, class = typename
         std::enable_if_t<has_equivalent_base_type_v<T1, T2>>>
-constexpr T1 operator+(const T1& t1, const T2& t2) {
-    return T1{t1.value + T1{t2}.value};
+constexpr auto operator+(const T1& t1, const T2& t2) {
+    using ret_type = SpecifiedUnit<typename T1::base_type, typename T1::ratio,
+            std::conditional_t<std::ratio_divide<typename T2::ratio, typename T1::ratio>::den == 1, decltype(t1.value + t2.value), decltype(t1.value + 1.0 * t2.value)>>;
+    return ret_type{t1.value + ret_type{t2}.value};
 }
 
 template<typename T1, typename T2, class = typename
         std::enable_if_t<has_equivalent_base_type_v<T1, T2>>>
-constexpr T1 operator-(const T1& t1, const T2& t2) {
-    return T1{t1.value - T1{t2}.value};
+constexpr auto operator-(const T1& t1, const T2& t2) {
+    using ret_type = SpecifiedUnit<typename T1::base_type, typename T1::ratio,
+            std::conditional_t<std::ratio_divide<typename T2::ratio, typename T1::ratio>::den == 1, decltype(t1.value - t2.value), decltype(t1.value - 1.0 * t2.value)>>;
+    return ret_type{t1.value - ret_type{t2}.value};
 }
 
 #endif //UNITMAKER_UNITS_H

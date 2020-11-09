@@ -51,6 +51,7 @@ struct RecursiveRatioMultiply<std::ratio<1, 1>> {
 };
 
 template<typename T, typename Numeric = double> // can't constrain on UnitType, since type will be incomplete at this point
+requires std::is_arithmetic_v<Numeric>
 struct AbstractUnit {
 private:
     template<UnitType To, UnitType From>
@@ -58,7 +59,7 @@ private:
     static constexpr To convert(const From& from) {
         using ratio_t = std::ratio<From::ratio::num * To::ratio::den, From::ratio::den * To::ratio::num>;
         if constexpr (std::is_integral_v<decltype(To::value)> && ratio_t::den == 1) {
-            return To{from.value * ratio_t::num};
+            return To{static_cast<decltype(To::value)>(from.value * ratio_t::num)};
         } else {
             constexpr double ratio = 1.0 * ratio_t::num / ratio_t::den;
             return To{from.value * ratio};
@@ -67,7 +68,7 @@ private:
 
     template<typename To, UnitType From>
     requires std::ratio_equal_v<typename From::ratio, std::ratio<1, 1>> && std::convertible_to<Numeric, To>
-    static constexpr double convert(const From& from) {
+    static constexpr To convert(const From& from) {
         return from.value;
     }
 public:
@@ -89,9 +90,9 @@ struct Unit : public AbstractUnit<Unit<Type, Numeric>, Numeric> {
     using ratio = std::ratio<1, 1>;
 };
 
-template<UnitType T, RatioType Ratio, typename Numeric = double>
-struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio, Numeric>, Numeric> {
-    using AbstractUnit<UnitRatio<T, Ratio, Numeric>, Numeric>::AbstractUnit;
+template<UnitType T, RatioType Ratio>
+struct UnitRatio : public AbstractUnit<UnitRatio<T, Ratio>, decltype(T::value)> {
+    using AbstractUnit<UnitRatio<T, Ratio>, decltype(T::value)>::AbstractUnit;
 
     using base_type = typename T::base_type;
     using ratio = std::ratio_multiply<Ratio, typename T::ratio>;
@@ -114,7 +115,7 @@ struct SpecifiedUnit : public AbstractUnit<SpecifiedUnit<BaseType, Ratio, Numeri
 };
 
 template<UnitType Type, typename Numeric>
-using UnitNumeric = SpecifiedUnit<typename Type::base_type, typename Type::ratio, Numeric>;
+using NumericUnit = SpecifiedUnit<typename Type::base_type, typename Type::ratio, Numeric>;
 
 template<BaseTypes Type, int ID, typename Numeric = double>
 struct RuntimeUnit {
@@ -138,9 +139,9 @@ struct RuntimeUnit {
     };
 };
 
-template<UnitType T, typename Numeric = double>
-struct UnitInverse : public AbstractUnit<UnitInverse<T, Numeric>, Numeric> {
-    using AbstractUnit<UnitInverse<T, Numeric>, Numeric>::AbstractUnit;
+template<UnitType T>
+struct UnitInverse : public AbstractUnit<UnitInverse<T>, decltype(T::value)> {
+    using AbstractUnit<UnitInverse<T>, decltype(T::value)>::AbstractUnit;
 
     using base_type = std::ratio_divide<std::ratio<1, 1>, typename T::base_type>;
     using ratio = std::ratio_divide<std::ratio<1, 1>, typename T::ratio>;
@@ -200,14 +201,16 @@ constexpr auto operator/(const T1& t, const T2& v) {
 template<UnitType T1, UnitType T2>
 requires EquivalentBaseType<T1, T2>
 constexpr auto operator+(const T1& t1, const T2& t2) {
-    using ret_type = SpecifiedUnit<typename T1::base_type, typename T1::ratio, decltype(t1.value + t2.value)>;
+    using ret_type = SpecifiedUnit<typename T1::base_type, typename T1::ratio,
+            std::conditional_t<std::ratio_divide<typename T2::ratio, typename T1::ratio>::den == 1, decltype(t1.value + t2.value), decltype(t1.value + 1.0 * t2.value)>>;
     return ret_type{t1.value + ret_type{t2}.value};
 }
 
 template<UnitType T1, UnitType T2>
 requires EquivalentBaseType<T1, T2>
 constexpr auto operator-(const T1& t1, const T2& t2) {
-    using ret_type = SpecifiedUnit<typename T1::base_type, typename T1::ratio, decltype(t1.value - t2.value)>;
+    using ret_type = SpecifiedUnit<typename T1::base_type, typename T1::ratio,
+            std::conditional_t<std::ratio_divide<typename T2::ratio, typename T1::ratio>::den == 1, decltype(t1.value - t2.value), decltype(t1.value - 1.0 * t2.value)>>;
     return ret_type{t1.value - ret_type{t2}.value};
 }
 
