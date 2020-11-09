@@ -129,15 +129,15 @@ struct SpecifiedUnit : public AbstractUnit<SpecifiedUnit<BaseType, Ratio>> {
     using ratio = Ratio;
 };
 
-template<BaseTypes Type>
+template<BaseTypes Type, int ID>
 struct RuntimeUnit {
     double value;
     explicit constexpr RuntimeUnit(double v): value(v) {}
 
-    template<typename T, class = typename std::enable_if_t<has_equivalent_base_type_v<T, RuntimeUnit<Type>>>>
+    template<typename T, class = typename std::enable_if_t<has_equivalent_base_type_v<T, RuntimeUnit<Type, ID>>>>
     explicit constexpr RuntimeUnit(T other): value{Unit<Type>{other}.value / ratio::num * ratio::den} {}
 
-    template<typename T, class = typename std::enable_if_t<has_equivalent_base_type_v<T, RuntimeUnit<Type>>>>
+    template<typename T, class = typename std::enable_if_t<has_equivalent_base_type_v<T, RuntimeUnit<Type, ID>>>>
     constexpr operator T() {
         return T{Unit<Type>{value * ratio::num / ratio::den}};
     }
